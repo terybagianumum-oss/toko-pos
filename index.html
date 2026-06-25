@@ -479,7 +479,7 @@
 
     <div id="printArea"></div>
 
-    <script>
+   <script>
         // URL Deployment Web App Google Apps Script Anda
         const GAS_URL = "https://script.google.com/macros/s/AKfycbx-_qI38NHmiAZiJ8UiKzgBGx98No44knc8YiCQkpZZrPmxWjwHtOrNSyJRWB-9vL_d/exec";
 
@@ -547,14 +547,14 @@
             });
         }
 
-        // FUNGSI KAMERA SCANNER (DIPERBAIKI)
+        // FUNGSI KAMERA SCANNER
         function startCameraScanner() {
             document.getElementById('reader').innerHTML = '';
             html5QrcodeScanner = new Html5Qrcode("reader");
             
             const qrCodeSuccessCallback = (decodedText) => {
                 if (decodedText) {
-                    const produk = dbMaster.produk.find(p => p.barcode === decodedText.trim());
+                    const produk = dbMaster.produk.find(p => String(p.barcode).trim() == String(decodedText).trim());
                     if (produk) {
                         addToCart(produk.id);
                         if (navigator.vibrate) navigator.vibrate(100);
@@ -566,7 +566,6 @@
                 }
             };
             
-            // "environment" otomatis menyalakan kamera belakang HP
             html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, qrCodeSuccessCallback)
             .catch(err => alert("Gagal akses kamera: " + err));
         }
@@ -575,7 +574,7 @@
             if (e.key === 'Enter') {
                 const code = e.target.value.trim();
                 if (!code) return;
-                const produk = dbMaster.produk.find(p => p.barcode === code);
+                const produk = dbMaster.produk.find(p => String(p.barcode).trim() == code);
                 if (produk) addToCart(produk.id);
                 else alert("Barcode tidak ditemukan!");
                 
@@ -604,20 +603,42 @@
             `).join('');
         }
 
+        // FIX BUG DI SINI: Menggunakan loose equality (==) & validasi Number
         function addToCart(id) {
-            const produk = dbMaster.produk.find(p => p.id === id);
-            if(!produk || produk.stok <= 0) { alert("Stok barang habis/kosong!"); return; }
-            const item = cart.find(x => x.id === id);
-            if(item) { if(item.qty < produk.stok) item.qty++; } 
-            else { cart.push({ id: produk.id, name: produk.name, qty: 1, harga_jual: produk.harga_eceran }); }
+            const produk = dbMaster.produk.find(p => p.id == id);
+            if(!produk) { alert("Produk tidak ditemukan!"); return; }
+            
+            const stokTersedia = Number(produk.stok);
+            if(stokTersedia <= 0) { alert("Stok barang habis/kosong!"); return; }
+            
+            const item = cart.find(x => x.id == id);
+            if(item) { 
+                if(item.qty < stokTersedia) {
+                    item.qty++; 
+                } else {
+                    alert("Jumlah belanja mmelebihi batas stok toko!");
+                    return;
+                }
+            } else { 
+                cart.push({ id: produk.id, name: produk.name, qty: 1, harga_jual: Number(produk.harga_eceran) }); 
+            }
             updateCartPrices();
         }
 
         function changeQty(id, change) {
-            const item = cart.find(x => x.id === id);
+            const item = cart.find(x => x.id == id);
             if(!item) return;
+            
+            const produk = dbMaster.produk.find(p => p.id == id);
+            const stokTersedia = Number(produk.stok);
+
             item.qty += change;
-            if(item.qty <= 0) cart = cart.filter(x => x.id !== id);
+            if(item.qty > stokTersedia) {
+                alert("Stok tidak mencukupi!");
+                item.qty = stokTersedia;
+            }
+
+            if(item.qty <= 0) cart = cart.filter(x => x.id == id);
             updateCartPrices();
         }
 
@@ -627,13 +648,15 @@
             let subtotal = 0;
 
             cart.forEach(item => {
-                const pMaster = dbMaster.produk.find(p => p.id === item.id);
-                if(item.qty >= pMaster.min_grosir || tipePelanggan === "Grosir") {
-                    item.harga_jual = pMaster.harga_grosir;
-                } else {
-                    item.harga_jual = pMaster.harga_eceran;
+                const pMaster = dbMaster.produk.find(p => p.id == item.id);
+                if(pMaster) {
+                    if(item.qty >= Number(pMaster.min_grosir) || tipePelanggan === "Grosir") {
+                        item.harga_jual = Number(pMaster.harga_grosir);
+                    } else {
+                        item.harga_jual = Number(pMaster.harga_eceran);
+                    }
+                    subtotal += (item.qty * item.harga_jual);
                 }
-                subtotal += (item.qty * item.harga_jual);
             });
 
             let diskon = Number(document.getElementById('inputDiskon').value) || 0;
