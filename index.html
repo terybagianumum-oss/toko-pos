@@ -504,6 +504,7 @@
         }
 
         // Fungsi Simpan Transaksi yang Valid Menggunakan Fetch API untuk GitHub Pages
+        // Fungsi Simpan Transaksi yang sudah diperbaiki dari bug NetworkError / CORS
         function prosesBayar() {
             if(cart.length === 0) return;
             
@@ -518,7 +519,7 @@
 
             fetch(GAS_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'text/plain' }, // FIX: Menggunakan text/plain untuk bypass CORS preflight error
                 body: JSON.stringify({
                     action: "simpanTransaksi",
                     cart: cart,
