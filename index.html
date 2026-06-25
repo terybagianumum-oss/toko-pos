@@ -534,65 +534,26 @@
         }
 
         function prosesBayar() {
-            if(cart.length === 0) return;
-            
-            const idPelanggan = document.getElementById('custSelect').value;
-            const subtotal = Number(document.getElementById('subtotalLabel').innerText.replace(/[^0-9]/g, ''));
-            const diskon = Number(document.getElementById('inputDiskon').value) || 0;
-            const totalBayar = Number(document.getElementById('totalLabel').innerText.replace(/[^0-9]/g, ''));
-            const jenisNota = document.querySelector('input[name="invType"]:checked').value;
+    if(cart.length === 0) return;
+    
+    // 1. Ambil ID Pelanggan (Jika element tidak ada, default ke 'Umum')
+    const custElem = document.getElementById('custSelect');
+    const idPelanggan = custElem ? custElem.value : 'Umum';
+    
+    const subtotal = Number(document.getElementById('subtotalLabel').innerText.replace(/[^0-9]/g, ''));
+    const diskon = Number(document.getElementById('inputDiskon').value) || 0;
+    const totalBayar = Number(document.getElementById('totalLabel').innerText.replace(/[^0-9]/g, ''));
+    
+    // 2. Ambil Jenis Nota dengan AMAN (Jika tidak ada yang dicentang, default ke 'kecil')
+    const notaElem = document.querySelector('input[name="invType"]:checked');
+    const jenisNota = notaElem ? notaElem.value : 'kecil';
 
-            document.getElementById('btnPay').disabled = true;
-            document.getElementById('btnPay').innerText = "Menyimpan Ke Cloud...";
-
-            fetch(GAS_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' }, 
-                body: JSON.stringify({
-                    action: "simpanTransaksi",
-                    cart: cart,
-                    idPelanggan: idPelanggan,
-                    subtotal: subtotal,
-                    diskon: diskon,
-                    totalBayar: totalBayar
-                })
-            })
-            .then(res => res.json())
-            .then(res => {
-                buildPrintInvoice(res, jenisNota);
-                window.print();
-                
-                // === PERUBAHAN DI SINI ===
-                // 1. Kurangi stok lokal di dbMaster berdasarkan item yang dibeli agar UI Gudang langsung sinkron tanpa fetch ulang
-                cart.forEach(itemBelanja => {
-                    const prod = dbMaster.produk.find(p => p.id == itemBelanja.id);
-                    if (prod) {
-                        prod.stok = Math.max(0, Number(prod.stok) - itemBelanja.qty);
-                    }
-                });
-
-                // 2. Kosongkan keranjang belanja kasir & reset input diskon
-                cart = [];
-                document.getElementById('inputDiskon').value = 0;
-                
-                // 3. Kembalikan kondisi tombol cetak
-                document.getElementById('btnPay').disabled = false;
-                document.getElementById('btnPay').innerText = "💾 Simpan & Cetak";
-                
-                // 4. Update UI Keranjang dan Etalase secara lokal saja (Fungsi stack, kamera, dan input tetap aman)
-                updateCartPrices();
-                renderProduk(); 
-                
-                // Autofocus kembali ke input barcode demi kelancaran scan berikutnya
-                document.getElementById('barcodeInput').focus();
-            })
-            .catch(err => {
-                alert("Gagal menyimpan transaksi: " + err);
-                document.getElementById('btnPay').disabled = false;
-                document.getElementById('btnPay').innerText = "💾 Simpan & Cetak";
-            });
-        }
-
+    // Kode kirim ke cloud (fetch) di bawahnya...
+    document.getElementById('btnPay').disabled = true;
+    document.getElementById('btnPay').innerText = "Menyimpan Ke Cloud...";
+    
+    // ... dst (lanjutkan ke fungsi fetch Anda)
+}
         function startCameraScanner() {
             document.getElementById('reader').innerHTML = '';
             html5QrcodeScanner = new Html5Qrcode("reader");
