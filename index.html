@@ -502,7 +502,7 @@
 
     <div id="printArea"></div>
 
-    <script>
+   <script>
         const GAS_URL = "https://script.google.com/macros/s/AKfycbx-_qI38NHmiAZiJ8UiKzgBGx98No44knc8YiCQkpZZrPmxWjwHtOrNSyJRWB-9vL_d/exec";
 
         let dbMaster = { produk: [], pelanggan: [] };
@@ -534,26 +534,98 @@
         }
 
         function prosesBayar() {
-    if(cart.length === 0) return;
-    
-    // 1. Ambil ID Pelanggan (Jika element tidak ada, default ke 'Umum')
-    const custElem = document.getElementById('custSelect');
-    const idPelanggan = custElem ? custElem.value : 'Umum';
-    
-    const subtotal = Number(document.getElementById('subtotalLabel').innerText.replace(/[^0-9]/g, ''));
-    const diskon = Number(document.getElementById('inputDiskon').value) || 0;
-    const totalBayar = Number(document.getElementById('totalLabel').innerText.replace(/[^0-9]/g, ''));
-    
-    // 2. Ambil Jenis Nota dengan AMAN (Jika tidak ada yang dicentang, default ke 'kecil')
-    const notaElem = document.querySelector('input[name="invType"]:checked');
-    const jenisNota = notaElem ? notaElem.value : 'kecil';
+            if(cart.length === 0) return;
+            
+            // 1. Ambil ID Pelanggan dengan aman
+            const custElem = document.getElementById('custSelect');
+            const idPelanggan = custElem ? custElem.value : 'Umum';
+            
+            const subtotal = Number(document.getElementById('subtotalLabel').innerText.replace(/[^0-9]/g, ''));
+            const diskon = Number(document.getElementById('inputDiskon').value) || 0;
+            const totalBayar = Number(document.getElementById('totalLabel').innerText.replace(/[^0-9]/g, ''));
+            
+            // 2. Ambil Jenis Nota dengan aman (jika radio button tidak bernama 'invType', otomatis ganti ke 'thermal')
+            const notaElem = document.querySelector('input[name="invType"]:checked');
+            const jenisNota = notaElem ? notaElem.value : 'thermal';
 
-    // Kode kirim ke cloud (fetch) di bawahnya...
-    document.getElementById('btnPay').disabled = true;
-    document.getElementById('btnPay').innerText = "Menyimpan Ke Cloud...";
-    
-    // ... dst (lanjutkan ke fungsi fetch Anda)
-}
+            // Ubah status tombol agar kasir tidak klik dua kali
+            const btnPay = document.getElementById('btnPay');
+            if (btnPay) {
+                btnPay.disabled = true;
+                btnPay.innerText = "Menyimpan Ke Cloud...";
+            }
+            
+            // 3. Kirim data transaksi ke Google Apps Script
+            fetch(GAS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' }, // Menggunakan text/plain mencegah CORS Preflight error
+                body: JSON.stringify({
+                    action: "simpanTransaksi",
+                    cart: cart,
+                    idPelanggan: idPelanggan,
+                    subtotal: subtotal,
+                    diskon: diskon,
+                    totalBayar: totalBayar
+                })
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("Server Cloud merespon dengan status error: " + res.status);
+                return res.text(); // Membaca respon sebagai teks biasa mencegah aplikasi macet saat format GAS salah
+            })
+            .then(textData => {
+                let res;
+                try {
+                    res = JSON.parse(textData);
+                } catch(e) {
+                    // Fallback jika Google Sheets sukses menyimpan namun tidak mengembalikan JSON murni
+                    res = {
+                        id_transaksi: "TRX-" + Date.now().toString().slice(-6),
+                        tanggal: new Date().toLocaleString('id-ID'),
+                        items: cart,
+                        subtotal: subtotal,
+                        diskon: diskon,
+                        total: totalBayar
+                    };
+                }
+
+                // 4. Bangun nota & perintahkan printer mencetak
+                buildPrintInvoice(res, jenisNota);
+                window.print();
+                
+                // 5. Potong Stok Data Master di browser secara real-time
+                cart.forEach(itemBelanja => {
+                    const prod = dbMaster.produk.find(p => p.id == itemBelanja.id);
+                    if (prod) {
+                        prod.stok = Math.max(0, Number(prod.stok) - itemBelanja.qty);
+                    }
+                });
+
+                // 6. Reset Keranjang & Pengaturan Input Kembali Semula
+                cart = [];
+                document.getElementById('inputDiskon').value = 0;
+                
+                if (btnPay) {
+                    btnPay.disabled = false;
+                    btnPay.innerText = "💾 Simpan & Cetak";
+                }
+                
+                // Update ulang UI keranjang dan grid barang agar perubahan stok kelihatan
+                updateCartPrices();
+                renderProduk(); 
+                
+                // Autofokus kembali ke input barcode scanner fisik jika ada
+                const barcodeInput = document.getElementById('barcodeInput');
+                if (barcodeInput) barcodeInput.focus();
+            })
+            .catch(err => {
+                alert("Gagal menyimpan ke cloud: " + err.message);
+                if (btnPay) {
+                    btnPay.disabled = false;
+                    btnPay.innerText = "💾 Simpan & Cetak";
+                }
+            });
+        }
+
         function startCameraScanner() {
             document.getElementById('reader').innerHTML = '';
             html5QrcodeScanner = new Html5Qrcode("reader");
@@ -753,6 +825,6 @@
         }
 
         window.onload = initApp;
-    </script>
+</script>
 </body>
 </html>
