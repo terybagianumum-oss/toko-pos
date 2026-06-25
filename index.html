@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Toko Retail Maju Perkasa</title>
+    <title>POS Toko Modern + Barcode & Diskon</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
@@ -238,12 +238,34 @@
             box-shadow: -4px 0 20px rgb(0 0 0 / 0.02);
         }
 
+        /* MODIFIKASI HEADER UNTUK BUTTON CLEAR */
         .cart-header { 
             padding: 1.5rem; 
             border-bottom: 1px solid var(--border); 
             font-weight: 700; 
             font-size: 1.25rem; 
             color: var(--text-dark); 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* TOMBOL KOSONGKAN KERANJANG */
+        .btn-clear-cart {
+            background: transparent;
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-clear-cart:hover {
+            background: var(--danger);
+            color: white;
         }
 
         .cart-items { 
@@ -446,7 +468,10 @@
         </div>
 
         <div class="cart-panel">
-            <div class="cart-header">Keranjang Kasir</div>
+            <div class="cart-header">
+                <span>Keranjang Kasir</span>
+                <button onclick="clearCart()" class="btn-clear-cart" title="Kosongkan Semua Item">🗑️ Kosongkan</button>
+            </div>
             <div id="cartItems" class="cart-items"></div>
             
             <div class="checkout-box">
@@ -479,15 +504,13 @@
 
     <div id="printArea"></div>
 
-   <script>
-        // URL Deployment Web App Google Apps Script Anda
+    <script>
         const GAS_URL = "https://script.google.com/macros/s/AKfycbx-_qI38NHmiAZiJ8UiKzgBGx98No44knc8YiCQkpZZrPmxWjwHtOrNSyJRWB-9vL_d/exec";
 
         let dbMaster = { produk: [], pelanggan: [] };
         let cart = [];
         let html5QrcodeScanner = null;
 
-        // Ambil data pertama kali via Fetch API
         function initApp() {
             fetch(GAS_URL + "?action=getMasterData")
                 .then(res => res.json())
@@ -503,8 +526,16 @@
                 });
         }
 
-        // Fungsi Simpan Transaksi yang Valid Menggunakan Fetch API untuk GitHub Pages
-        // Fungsi Simpan Transaksi yang sudah diperbaiki dari bug NetworkError / CORS
+        // Fungsi Clear Keranjang Manual
+        function clearCart() {
+            if (cart.length === 0) return;
+            if (confirm("Apakah Anda yakin ingin mengosongkan semua barang di keranjang belanja?")) {
+                cart = [];
+                document.getElementById('inputDiskon').value = 0;
+                updateCartPrices();
+            }
+        }
+
         function prosesBayar() {
             if(cart.length === 0) return;
             
@@ -519,7 +550,7 @@
 
             fetch(GAS_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain' }, // FIX: Menggunakan text/plain untuk bypass CORS preflight error
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({
                     action: "simpanTransaksi",
                     cart: cart,
@@ -534,12 +565,11 @@
                 buildPrintInvoice(res, jenisNota);
                 window.print();
                 
-                // Reset setelah sukses transaksi
                 cart = [];
                 document.getElementById('inputDiskon').value = 0;
                 document.getElementById('btnPay').disabled = false;
                 document.getElementById('btnPay').innerText = "💾 Simpan & Cetak";
-                initApp(); // Refresh stok barang otomatis
+                initApp(); 
             })
             .catch(err => {
                 alert("Gagal menyimpan transaksi: " + err);
@@ -548,7 +578,6 @@
             });
         }
 
-        // FUNGSI KAMERA SCANNER
         function startCameraScanner() {
             document.getElementById('reader').innerHTML = '';
             html5QrcodeScanner = new Html5Qrcode("reader");
@@ -604,7 +633,6 @@
             `).join('');
         }
 
-        // FIX BUG DI SINI: Menggunakan loose equality (==) & validasi Number
         function addToCart(id) {
             const produk = dbMaster.produk.find(p => p.id == id);
             if(!produk) { alert("Produk tidak ditemukan!"); return; }
@@ -617,7 +645,7 @@
                 if(item.qty < stokTersedia) {
                     item.qty++; 
                 } else {
-                    alert("Jumlah belanja mmelebihi batas stok toko!");
+                    alert("Jumlah belanja melebihi batas stok toko!");
                     return;
                 }
             } else { 
@@ -639,7 +667,7 @@
                 item.qty = stokTersedia;
             }
 
-            if(item.qty <= 0) cart = cart.filter(x => x.id == id);
+            if(item.qty <= 0) cart = cart.filter(x => x.id != id);
             updateCartPrices();
         }
 
