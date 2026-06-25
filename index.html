@@ -536,7 +536,7 @@
             }
         }
 
-        function prosesBayar() {
+       function prosesBayar() {
             if(cart.length === 0) return;
             
             const idPelanggan = document.getElementById('custSelect').value;
@@ -550,7 +550,7 @@
 
             fetch(GAS_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
+                headers: { 'Content-Type': 'text/plain' }, // FIX: Menggunakan text/plain untuk bypass CORS preflight error
                 body: JSON.stringify({
                     action: "simpanTransaksi",
                     cart: cart,
@@ -565,11 +565,12 @@
                 buildPrintInvoice(res, jenisNota);
                 window.print();
                 
+                // Reset setelah sukses transaksi
                 cart = [];
                 document.getElementById('inputDiskon').value = 0;
                 document.getElementById('btnPay').disabled = false;
                 document.getElementById('btnPay').innerText = "💾 Simpan & Cetak";
-                initApp(); 
+                initApp(); // Refresh stok barang otomatis
             })
             .catch(err => {
                 alert("Gagal menyimpan transaksi: " + err);
