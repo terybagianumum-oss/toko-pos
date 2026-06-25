@@ -238,7 +238,6 @@
             box-shadow: -4px 0 20px rgb(0 0 0 / 0.02);
         }
 
-        /* MODIFIKASI HEADER UNTUK BUTTON CLEAR */
         .cart-header { 
             padding: 1.5rem; 
             border-bottom: 1px solid var(--border); 
@@ -250,7 +249,6 @@
             align-items: center;
         }
 
-        /* TOMBOL KOSONGKAN KERANJANG */
         .btn-clear-cart {
             background: transparent;
             border: 1px solid var(--danger);
@@ -483,7 +481,7 @@
                 </div>
                 
                 <div class="summary-row">
-                    <span>Subtotal</span>
+                    <span id="subtotalLabelText">Subtotal</span>
                     <strong id="subtotalLabel">Rp 0</strong>
                 </div>
                 
@@ -526,7 +524,6 @@
                 });
         }
 
-        // Fungsi Clear Keranjang Manual
         function clearCart() {
             if (cart.length === 0) return;
             if (confirm("Apakah Anda yakin ingin mengosongkan semua barang di keranjang belanja?")) {
@@ -536,7 +533,7 @@
             }
         }
 
-       function prosesBayar() {
+        function prosesBayar() {
             if(cart.length === 0) return;
             
             const idPelanggan = document.getElementById('custSelect').value;
@@ -550,7 +547,7 @@
 
             fetch(GAS_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain' }, // FIX: Menggunakan text/plain untuk bypass CORS preflight error
+                headers: { 'Content-Type': 'text/plain' }, 
                 body: JSON.stringify({
                     action: "simpanTransaksi",
                     cart: cart,
@@ -565,12 +562,29 @@
                 buildPrintInvoice(res, jenisNota);
                 window.print();
                 
-                // Reset setelah sukses transaksi
+                // === PERUBAHAN DI SINI ===
+                // 1. Kurangi stok lokal di dbMaster berdasarkan item yang dibeli agar UI Gudang langsung sinkron tanpa fetch ulang
+                cart.forEach(itemBelanja => {
+                    const prod = dbMaster.produk.find(p => p.id == itemBelanja.id);
+                    if (prod) {
+                        prod.stok = Math.max(0, Number(prod.stok) - itemBelanja.qty);
+                    }
+                });
+
+                // 2. Kosongkan keranjang belanja kasir & reset input diskon
                 cart = [];
                 document.getElementById('inputDiskon').value = 0;
+                
+                // 3. Kembalikan kondisi tombol cetak
                 document.getElementById('btnPay').disabled = false;
                 document.getElementById('btnPay').innerText = "💾 Simpan & Cetak";
-                initApp(); // Refresh stok barang otomatis
+                
+                // 4. Update UI Keranjang dan Etalase secara lokal saja (Fungsi stack, kamera, dan input tetap aman)
+                updateCartPrices();
+                renderProduk(); 
+                
+                // Autofocus kembali ke input barcode demi kelancaran scan berikutnya
+                document.getElementById('barcodeInput').focus();
             })
             .catch(err => {
                 alert("Gagal menyimpan transaksi: " + err);
